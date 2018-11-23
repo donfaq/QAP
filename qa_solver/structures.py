@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 from functools import total_ordering
 
 
@@ -19,11 +20,11 @@ class QASolution:
     @property
     def objective_function(self):
         res = 0
-        for i in range(self._problem.n):
-            for j in range(self._problem.n):
-                res += (
-                    self._problem.flows[i][j] *
-                    self._problem.distances[self._sol[i]][self._sol[j]])
+        for i, j in itertools.permutations(range(self._problem.n), 2):
+            res += (
+                self._problem.flows[i][j]
+                * self._problem.distances[self._sol[i]][self._sol[j]]
+            )
         return res
 
     def __gt__(self, other):
@@ -34,8 +35,5 @@ class QASolution:
 
     def __repr__(self):
         return (
-            str(self._sol.tolist())
-            .replace("[", "")
-            .replace("]", "")
-            .replace(",", "")
+            str(self._sol.tolist()).replace("[", "").replace("]", "").replace(",", "")
         )

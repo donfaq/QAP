@@ -11,8 +11,8 @@ class QAReader:
             n = int(f.readline().strip())
             distances, flows = [], []
             for _ in range(n):
-                distances.append(list(map(int, f.readline().split())))
+                flows.append(list(map(int, f.readline().split())))
             _ = f.readline()
             for _ in range(n):
-                flows.append(list(map(int, f.readline().split())))
+                distances.append(list(map(int, f.readline().split())))
         return QAProblem(n, distances, flows)

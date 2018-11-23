@@ -1,10 +1,11 @@
 import numpy as np
-
 from qa_solver.structures import QAProblem, QASolution
 
 
 class QASolver:
-    def __init__(self, problem: QAProblem, population_size=5, n_children=5, mutation_p=0.2):
+    def __init__(
+        self, problem: QAProblem, population_size=10, n_children=100, mutation_p=0.2
+    ):
         self._problem = problem
         self._pop_size = population_size
         self._n_children = n_children
@@ -32,14 +33,15 @@ class QASolver:
             return QASolution(par1._problem, child)
 
         res = []
+        probs = self._fitness(population)
         for _ in range(self._n_children):
-            par_a, par_b = np.random.choice(population, size=2, replace=False, p=self._fitness(population))
+            par_a, par_b = np.random.choice(population, size=2, replace=False, p=probs)
             res.append(ox(par_a, par_b))
         return np.array(res)
 
     def _mutation(self, solution: QASolution):
         res = solution._sol.copy()
-        if np.random.sample() < self._p_m:
+        if np.random.sample() <= self._p_m:
             size = np.random.randint(2, res.shape[0])
             start_idx = np.random.randint(res.shape[0] - size + 1)
             sl = np.arange(start_idx, start_idx + size)
@@ -55,20 +57,17 @@ class QASolver:
     def solve(self):
         population = self._generate_init_pop()
         best = min(population)
-        no_improvement = 0
-        # while no_improvement < 10:
         while True:
-            no_improvement += 1
             offsprings = list(map(self._mutation, self._crossover(population)))
             population = np.concatenate([population, offsprings])
-            population = np.random.choice(population, size=self._pop_size,
-                                          replace=False, p=self._fitness(population))
-            # print(population)
+            population = np.random.choice(
+                population,
+                size=self._pop_size,
+                replace=False,
+                p=self._fitness(population),
+            )
             cur_opt = min(population)
             if cur_opt < best:
-                no_improvement = 0
                 best = cur_opt
                 print(best, best.objective_function)
         return best
-
-
