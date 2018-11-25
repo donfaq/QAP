@@ -1,6 +1,7 @@
-import numpy as np
 import itertools
 from functools import total_ordering
+
+import numpy as np
 
 
 class QAProblem:

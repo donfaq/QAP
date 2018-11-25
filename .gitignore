@@ -2,6 +2,7 @@
 .vscode
 *__pycache__/
 *.pyc
+*.pyx
 *.pytest_cache/
 solutions/
 *.sol
