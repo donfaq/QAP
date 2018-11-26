@@ -5,12 +5,20 @@ from qa_solver.structures import QAProblem, QASolution
 
 class QASolver:
     def __init__(
-        self, problem: QAProblem, population_size=5, n_children=5, mutation_p=0.2
+        self,
+        problem: QAProblem,
+        population_size=5,
+        n_children=5,
+        mutation_p=0.25,
+        converge_steps=500,
+        perturbation_steps=10,
     ):
         self._problem = problem
         self._pop_size = population_size
         self._n_children = n_children
         self._p_m = mutation_p
+        self._conv_steps = converge_steps
+        self._perturb_steps = perturbation_steps
 
     def _gen_random_solution(self):
         sol = np.arange(self._problem.n)
@@ -21,6 +29,10 @@ class QASolver:
         return np.array([self._gen_random_solution() for _ in range(self._pop_size)])
 
     def _ox(self, par1: QASolution, par2: QASolution):
+        """Ordered crossover
+        We take a random consecutive segment of one parent. From the second we throw out all the values 
+        encountered in the selected segment and add the rest to the child.
+        """
         a, b = par1._sol.copy(), par2._sol.copy()
         size = np.random.randint(2, a.shape[0] // 2)
         start_idx = np.random.randint(a.shape[0] - size)
@@ -68,62 +80,90 @@ class QASolver:
     def _crossover(self, population: np.ndarray):
         children = []
         probs = self._fitness(population)
+        n_steps = 0
         while len(children) < self._n_children:
-            par_a, par_b = np.random.choice(population, size=2, replace=False, p=probs)
-            cross_func = np.random.choice([self._ulx, self._ox])
-            child = cross_func(par_a, par_b)
+            n_steps += 1
+            if n_steps < 50:
+                par_a, par_b = np.random.choice(population, size=2, replace=False, p=probs)
+                cross_func = np.random.choice([self._ulx, self._ox])
+                child = cross_func(par_a, par_b)
+            else:
+                # If you haven't faced a unique child in 50 iterations, we generate a random one.
+                child = self._gen_random_solution()
             assert len(set(child._sol)) == child._sol.shape[0], "child not feasible"
             if child not in population and child not in children:
+                # Appending only unique childs
+                n_steps = 0
                 children.append(child)
         return np.array(children)
+    
+
+    def _shuffle_mutation(self, array: np.ndarray):
+        """Shuffles a randomly selected sequential segment of a solution."""
+        size = np.random.randint(2, array.shape[0])
+        start_idx = np.random.randint(array.shape[0] - size + 1)
+        sl = np.arange(start_idx, start_idx + size)
+        a = array[sl]
+        np.random.shuffle(a)
+        array[sl] = a
+        return array
+    
+    def _reversed_mutation(self, array: np.ndarray):
+        """Reversed the order of a randomly selected solution segment."""
+        size = np.random.randint(2, array.shape[0])
+        start_idx = np.random.randint(array.shape[0] - size + 1)
+        sl = np.arange(start_idx, start_idx + size)
+        array[sl] = list(reversed(array[sl]))
+        return array
 
     def _mutation(self, solution: QASolution):
         res = solution._sol.copy()
         if np.random.sample() <= self._p_m:
-            size = np.random.randint(2, res.shape[0])
-            start_idx = np.random.randint(res.shape[0] - size + 1)
-            sl = np.arange(start_idx, start_idx + size)
-            a = res[sl]
-            np.random.shuffle(a)
-            res[sl] = a
+            mutation_operator = np.random.choice([self._shuffle_mutation])
+            res = mutation_operator(res)
         return QASolution(solution._problem, res)
 
     def _fitness(self, population):
-        ranks = {str(el._sol): rank for rank, el in enumerate(sorted(population))}
-        ranks = np.array(list(map(lambda x: ranks[str(x._sol)], population)))
+        """Assigns each chromosome a weight proportional to the place in the sample 
+        sorted by the value of the objective function. 
+        """
+        ranks = {str(el): rank for rank, el in enumerate(sorted(population))}
+        ranks = np.array(list(map(lambda x: ranks[str(x)], population)))
         return ranks / ranks.sum()
-        # obj = np.array(list(map(lambda x: x.objective_function, population)))
-        # obj = 1 / np.array(list(map(lambda x: x.objective_function, population)))
-        # return obj / obj.sum()
 
     def solve(self):
         population = self._gen_random_pop()
         best = min(population)
         n_converge = 0
         not_cool_count = 0
-        while n_converge < 100:
-            not_cool = True
+        while n_converge < self._perturb_steps:
             offsprings = list(map(self._mutation, self._crossover(population)))
             population = np.concatenate([population, offsprings])
-            # select n best from population
+
+            ## wheel selection
             # population = np.random.choice(population, size=self._pop_size,
             #     replace=False, p=self._fitness(population))
+
+            # select n best from population
             population = sorted(population, reverse=True)[self._pop_size :]
+
+            # for p in population:
+            #     print(p, p.objective_function)
+            # print("------------------------")
+
             cur_opt = min(population)
             if cur_opt < best:
-                not_cool = False
                 best = cur_opt
                 print(best, best.objective_function)
             else:
                 not_cool_count += 1
-            if not_cool_count > 500:
+            if not_cool_count > self._conv_steps:
                 # perturbate this garbage
                 population = np.concatenate([population, self._gen_random_pop()])
                 population = np.random.choice(
-                    population, 
-                    size=self._pop_size, 
-                    replace=False
+                    population, size=self._pop_size, replace=False
                 )
+                not_cool_count = 0
                 n_converge += 1
-
+                print("Converge count: {}. Perturbation.".format(n_converge))
         return best
