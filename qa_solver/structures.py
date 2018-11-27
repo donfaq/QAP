@@ -17,9 +17,9 @@ class QASolution:
         self._problem: QAProblem = problem
         assert len(sol) == self._problem.n, "Incorrect sol"
         self._sol = np.array(sol)
+        self.objective_function = self._objective_function()
 
-    @property
-    def objective_function(self):
+    def _objective_function(self):
         res = 0
         for i, j in itertools.permutations(range(self._problem.n), 2):
             res += (
